@@ -17,7 +17,7 @@ export function stepLabel(step) {
 export function makeWindow(bars, first, last) {
   const total = bars.length * STEPS_PER_BAR;
   const length = (last - first + total) % total + 1;
-  return Array.from({length}, (_, index) => {
+  const entries = Array.from({length}, (_, index) => {
     const absolute = (first + index) % total;
     const bar = Math.floor(absolute / STEPS_PER_BAR);
     const slot = absolute % STEPS_PER_BAR;
@@ -26,6 +26,20 @@ export function makeWindow(bars, first, last) {
     const duration = Math.min(event[0] + event[1] - slot, length - index);
     return {absolute, bar, slot, event, starts, duration};
   });
+  for (const [index, entry] of entries.entries()) {
+    if (!entry.starts || index === 0 || entry.event[4] !== "tie") continue;
+    const former = entries[index - 1].event;
+    if (former[2] === entry.event[2] && former[3] === entry.event[3]) entry.starts = false;
+  }
+  for (const [index, entry] of entries.entries()) {
+    if (!entry.starts || entry.event.length < 4) continue;
+    let next = entries[index + entry.duration];
+    while (next && !next.starts && next.event[4] === "tie") {
+      entry.duration += next.duration;
+      next = entries[index + entry.duration];
+    }
+  }
+  return entries;
 }
 
 const noteNames = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];

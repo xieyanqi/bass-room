@@ -101,7 +101,7 @@ export function makeBars(exercise, rhythmId) {
 
   // Follow each bar's melodic order at the chosen rhythm, stretching or thinning the notes as needed.
   return exercise.bars.map(bar => {
-    const notes = bar.filter(event => event.length === 4);
+    const notes = bar.filter(event => event.length >= 4);
     if (!notes.length) return bar;
     const noteCount = rhythm.pattern.filter(([, rest]) => !rest).length;
     let step = 0;
@@ -111,7 +111,7 @@ export function makeBars(exercise, rhythmId) {
       step += length;
       if (!rest) {
         const index = noteCount > 1 ? Math.round(played * (notes.length - 1) / (noteCount - 1)) : 0;
-        event.push(...notes[index].slice(2));
+        event.push(...notes[index].slice(2, 4));
         played++;
       }
       return event;
@@ -119,4 +119,8 @@ export function makeBars(exercise, rhythmId) {
   });
 }
 
-export const durationNames = {1: "十六分音符", 2: "八分音符", 4: "四分音符", 8: "二分音符", 16: "全音符"};
+const durationNames = {1: "十六分音符", 2: "八分音符", 3: "附点八分音符", 4: "四分音符", 6: "附点四分音符", 8: "二分音符", 12: "附点二分音符", 16: "全音符"};
+
+export function durationName(steps) {
+  return durationNames[steps] ?? steps / STEPS_PER_BEAT + " 拍";
+}

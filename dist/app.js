@@ -1,6 +1,6 @@
-import {exercises, rhythms, strings, durationNames, makeBars, STEPS_PER_BAR, STEPS_PER_BEAT} from "./exercises.js";
+import {exercises, rhythms, strings, durationName, makeBars, STEPS_PER_BAR, STEPS_PER_BEAT} from "./exercises.js";
 
-import {countLabel, stepLabel, makeWindow, pitchName, customTabExample, parseTab} from "./practice.js";
+import {countLabel, stepLabel, makeWindow, pitchName, parseTab} from "./practice.js";
 import {createNoteTracker, monitorInput} from "./pitch.js";
 
 const $ = id => document.getElementById(id);
@@ -17,7 +17,7 @@ const announcement = $("play-announcement");
 const pickButton = $("pick-beats");
 const micButton = $("mic-button");
 const subdivision = $("subdivision");
-const customStorage = "bass-room.custom-tab.v1";
+const scoreStorage = "bass-room.imported-score.v1";
 
 const minTempo = Number(tempoRange.min);
 const maxTempo = Number(tempoRange.max);
@@ -93,6 +93,7 @@ function selectExercise(item) {
   $("exercise-description").textContent = item.description;
   $("exercise-style").textContent = item.style;
   $("exercise-level").textContent = item.level;
+  showImportInfo(item.imported);
   for (const button of document.querySelectorAll(".exercise-item")) {
     button.setAttribute("aria-pressed", String(button.dataset.exercise === item.id));
   }
@@ -118,6 +119,7 @@ function renderScore() {
   const last = customRange && rangeSelect.value === "custom" ? customRange.last : all ? bars.length * STEPS_PER_BAR - 1 : first + STEPS_PER_BAR - 1;
   section = makeWindow(bars, first, last);
   const included = new Set(section.map(entry => entry.absolute));
+  const includedBars = new Set(section.map(entry => entry.bar));
   score.classList.toggle("many-bars", bars.length > 2);
   $("score-detail").textContent = "· " + bars.length + " 小节";
   $("rhythm-hint").textContent = gridInterval === 1 ? "数拍 1 e & a" : "数拍 1 & 2 & 3 & 4 &";
@@ -130,11 +132,21 @@ function renderScore() {
     const measure = document.createElement("div");
     measure.className = "measure";
     const barStart = measureIndex * STEPS_PER_BAR;
-    measure.classList.toggle("out-of-range", !section.some(entry => entry.bar === measureIndex));
+    measure.classList.toggle("out-of-range", !includedBars.has(measureIndex));
     measure.innerHTML = '<div class="measure-title"></div><div class="measure-rows"><div class="string-labels" aria-hidden="true"></div><div class="measure-grid"></div></div>';
-    const title = "第 " + (measureIndex + 1) + " 小节";
-    measure.querySelector(".measure-title").textContent = title
-      + (exercise.sections ? " · " + exercise.sections[measureIndex] : "");
+    const heading = measure.querySelector(".measure-title");
+    heading.textContent = "第 " + (measureIndex + 1) + " 小节";
+    if (exercise.sections) heading.append(" · " + exercise.sections[measureIndex]);
+    const metadata = exercise.imported?.metadata[measureIndex];
+    if (metadata) {
+      heading.append(" · 原谱第 " + metadata.page + " 页");
+      if (metadata.estimated) {
+        const estimate = document.createElement("span");
+        estimate.className = "estimate-tag";
+        estimate.textContent = "时值估算";
+        heading.append(estimate);
+      }
+    }
     measure.querySelector(".string-labels").replaceChildren(...strings.map(({name}) => {
       const label = document.createElement("span");
       label.textContent = name;
@@ -179,7 +191,11 @@ function renderScore() {
           const fret = document.createElement("span");
           fret.className = "fret";
           fret.textContent = event[3];
-          fret.title = strings[string].name + " 弦 " + event[3] + " 品 · " + durationNames[event[1]];
+          fret.title = strings[string].name + " 弦 " + event[3] + " 品 · " + durationName(event[1]);
+          if (event[4] === "tie") {
+            fret.classList.add("tied-fret");
+            fret.title += "（延音）";
+          }
           fret.setAttribute("aria-label", fret.title);
           row.append(fret);
         }
@@ -251,10 +267,11 @@ function rhythmMark(event) {
     mark.title = (duration / STEPS_PER_BEAT) + " 拍休止";
   } else {
     mark.classList.add("note-mark");
-    mark.title = durationNames[duration];
-    if (duration === 8) mark.classList.add("half");
+    mark.title = durationName(duration);
+    if (duration === 3 || duration === 6 || duration === 12) mark.classList.add("dotted");
+    if (duration === 8 || duration === 12) mark.classList.add("half");
     if (duration === 16) mark.classList.add("whole");
-    if (duration <= 2) {
+    if (duration <= 3) {
       const flag = document.createElement("span");
       flag.className = "flag";
       mark.append(flag);
@@ -320,7 +337,7 @@ function paint(frame) {
   }
   if (slot) {
     slot.classList.toggle("rest-active", place.event.length === 2);
-    slot.classList.toggle("held-active", place.event.length === 4 && place.event[0] !== place.slot && !place.starts);
+    slot.classList.toggle("held-active", place.event.length >= 4 && !place.starts);
   }
   if (!micCleanup) setCue(isCountIn ? "听完预备拍，再开始弹。" : cueFor(reveal ? place : null));
 
@@ -347,10 +364,10 @@ function keepInView(measure) {
 function cueFor(place) {
   if (mode === "read") return "独立读谱 · 保留节拍，按 TAB 自己数拍。";
   if (!place) return "播放时看拨弦、延音和消音提示。";
-  const [start, length, string, fret] = place.event;
+  const [, length, string, fret] = place.event;
   if (string === undefined) return "休止 · 消音，继续数拍";
-  if (start !== place.slot && !place.starts) return "延音 · 保持当前音";
-  return "拨弦 · " + strings[string].name + " 弦 " + fret + " 品 · " + durationNames[length];
+  if (!place.starts) return "延音 · 保持当前音";
+  return "拨弦 · " + strings[string].name + " 弦 " + fret + " 品 · " + durationName(length);
 }
 
 function setCue(text) {
@@ -474,7 +491,7 @@ function schedule() {
     const slot = place?.slot ?? nextStep + STEPS_PER_BAR;
     const interval = place ? Number(subdivision.value) : STEPS_PER_BEAT;
     if (slot % interval === 0) playClick(time, slot === 0, slot % STEPS_PER_BEAT === 0);
-    if (place?.starts && place.event.length === 4) {
+    if (place?.starts && place.event.length >= 4) {
       playBass(time, place.duration * secondsPerStep() * 0.92, place.event[2], place.event[3]);
     }
     nextStep++;
@@ -663,7 +680,7 @@ function clearMicMarks() {
 }
 
 function noteTargets() {
-  return section.filter(entry => entry.starts && entry.event.length === 4);
+  return section.filter(entry => entry.starts && entry.event.length >= 4);
 }
 
 function resetMicProgress() {
@@ -797,61 +814,143 @@ window.addEventListener("pagehide", () => {
   if (micCleanup || micPending) stopMicrophone();
 });
 
-function buildCustom(input) {
+function showImportInfo(result) {
+  $("import-info").hidden = !result;
+  const details = $("source-details");
+  details.open = false;
+  details.hidden = !result?.preview;
+  if (!result) return;
+  const estimated = result.metadata.filter(bar => bar.estimated).length;
+  const parts = [
+    "识别出 " + result.bars.length + " 小节",
+    result.bpm ? "谱面速度 " + result.bpm + " BPM" : "未读到谱面速度，先用 70 BPM"
+  ];
+  if (estimated) parts.push(estimated + " 小节的时值为估算");
+  if (result.missed.length) parts.push("未读到第 " + result.missed.join("、") + " 页的四线谱");
+  $("import-summary").textContent = parts.join(" · ");
+  if (result.preview) $("source-page").src = result.preview;
+  else $("source-page").removeAttribute("src");
+}
+
+function buildImported(result) {
   return {
-    id: "custom-tab", group: "自定义 TAB", icon: "♪", name: input.name || "我的 TAB 谱段",
-    level: "自定义", style: "四弦 TAB", focus: "当前浏览器中保存", bpm: 70,
-    description: "从你导入的四线谱生成，可以直接选拍、调速或用麦克风跟谱。",
-    tip: "先用原节奏检查音和休止的位置。需要改时值时，点「导入自定义 TAB」重新编辑。",
-    bars: parseTab(input.tab, input.timing)
+    id: "imported-score", group: "我的谱子", icon: "♪",
+    name: result.name || "上传的四线谱",
+    level: "已导入", style: "四弦 TAB", focus: result.bars.length + " 小节",
+    bpm: result.bpm ?? 70,
+    description: "可以试听、跟拍、调速或循环这份谱。",
+    tip: "先低速试听一遍。拿标有「时值估算」的小节和原谱对照，再选两拍反复练习。",
+    bars: result.bars, imported: result
   };
 }
 
-let customSource, customExercise;
-try {
-  const saved = JSON.parse(localStorage.getItem(customStorage));
-  if (saved) {
-    customExercise = buildCustom(saved);
-    customSource = saved;
-  }
-} catch {
-  // An unavailable or invalid local entry should never prevent opening the exercises.
+function previousImport() {
+  const saved = JSON.parse(localStorage.getItem(scoreStorage));
+  if (saved) return saved;
+  // Preserve a previously saved hand-entered practice without exposing the old editing form.
+  const old = JSON.parse(localStorage.getItem("bass-room.custom-tab.v1"));
+  if (!old) return null;
+  const bars = parseTab(old.tab, old.timing);
+  return {name: old.name, bars, bpm: null, metadata: [], missed: [], preview: null};
 }
 
-const dialog = $("tab-dialog");
+let customExercise;
+try {
+  const saved = previousImport();
+  if (saved) customExercise = buildImported(saved);
+} catch {
+  // An unavailable or invalid local entry should never prevent opening the built-in exercises.
+}
+
+const scoreDialog = $("score-dialog");
+const fileInput = $("score-file");
+const dropZone = $("score-drop");
+const progressBar = $("score-progress");
+const importStatus = $("score-status");
+const importError = $("score-error");
+const cancelImport = $("score-cancel");
+let upload;
+
 $("import-tab").addEventListener("click", () => {
-  $("tab-name").value = customSource?.name ?? "";
-  $("tab-input").value = customSource?.tab ?? "";
-  $("tab-input").placeholder = customTabExample;
-  $("tab-timing").value = customSource?.timing ?? "";
-  $("tab-error").hidden = true;
-  dialog.showModal();
+  fileInput.value = "";
+  importError.hidden = true;
+  importStatus.hidden = true;
+  progressBar.hidden = true;
+  scoreDialog.showModal();
 });
-$("tab-cancel").addEventListener("click", () => dialog.close());
-$("tab-example").addEventListener("click", () => {
-  $("tab-input").value = customTabExample;
-  $("tab-timing").value = "";
-  $("tab-error").hidden = true;
+cancelImport.addEventListener("click", () => scoreDialog.close());
+scoreDialog.addEventListener("close", () => {
+  upload?.abort();
+  upload = null;
+  fileInput.disabled = false;
+  dropZone.classList.remove("dragging", "busy");
+  cancelImport.textContent = "关闭";
 });
-$("tab-form").addEventListener("submit", event => {
-  event.preventDefault();
-  const input = {name: $("tab-name").value.trim(), tab: $("tab-input").value, timing: $("tab-timing").value};
+
+function showProgress(value, total) {
+  progressBar.hidden = false;
+  importStatus.hidden = false;
+  if (total) {
+    progressBar.max = total;
+    progressBar.value = value - 1;
+    importStatus.textContent = "正在识别第 " + value + " / " + total + " 页…";
+  } else {
+    progressBar.removeAttribute("value");
+    importStatus.textContent = "正在读取谱面…";
+  }
+}
+
+async function convertUpload(file) {
+  if (!file || upload) return;
+  const request = new AbortController();
+  upload = request;
+  fileInput.disabled = true;
+  dropZone.classList.add("busy");
+  cancelImport.textContent = "取消识别";
+  importError.hidden = true;
+  showProgress();
   try {
-    const imported = buildCustom(input);
-    customSource = input;
-    customExercise = imported;
+    const {importScore} = await import("./score-import.js");
+    const imported = await importScore(file, {signal: request.signal, progress: showProgress});
+    if (upload !== request) return;
+    customExercise = buildImported(imported);
     try {
-      localStorage.setItem(customStorage, JSON.stringify(input));
+      localStorage.setItem(scoreStorage, JSON.stringify(imported));
     } catch {
-      announcement.textContent = "谱段已载入本页，但当前浏览器无法永久保存。";
+      announcement.textContent = "谱面可以在本页使用。当前浏览器空间不足，刷新后可能需要重新上传。";
     }
     renderLibrary();
     selectExercise(customExercise);
-    dialog.close();
+    upload = null;
+    scoreDialog.close();
+    $("exercise-title").focus();
   } catch (error) {
-    $("tab-error").textContent = error.message;
-    $("tab-error").hidden = false;
+    if (upload !== request) return;
+    importError.textContent = error.message || "无法识别这个文件，请换一张清晰的谱面重试。";
+    importError.hidden = false;
+  } finally {
+    if (upload === request) {
+      upload = null;
+      fileInput.value = "";
+      fileInput.disabled = false;
+      dropZone.classList.remove("busy");
+      progressBar.hidden = true;
+      importStatus.hidden = true;
+      cancelImport.textContent = "关闭";
+    }
   }
+}
+
+fileInput.addEventListener("change", () => convertUpload(fileInput.files[0]));
+dropZone.addEventListener("dragover", event => {
+  event.preventDefault();
+  if (!upload) dropZone.classList.add("dragging");
+});
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragging"));
+dropZone.addEventListener("drop", event => {
+  event.preventDefault();
+  dropZone.classList.remove("dragging");
+  convertUpload(event.dataTransfer.files[0]);
 });
 
 renderLibrary();

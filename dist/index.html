@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f4ee">
+  <meta name="theme-color" content="#f2ebe2">
   <meta name="description" content="和节拍一起读谱。四弦贝斯原创练习，支持分段循环、BPM 调速和同步高亮。">
   <title>低音练习室 · Bass Room</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%231d342c'/%3E%3Cpath d='M14 32V22m7 10V15m7 17V19m7 13V11' stroke='%23e2f398' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%2323344b'/%3E%3Cpath d='M14 32V22m7 10V15m7 17V19m7 13V11' stroke='%23f4c494' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="./app.js"></script>
 </head>
@@ -24,8 +24,8 @@
         <h2 id="library-title">练习库</h2>
         <span id="exercise-count"></span>
       </div>
+      <button type="button" id="import-tab" class="outline-button import-button">＋ 上传谱子</button>
       <div id="exercise-list"></div>
-      <button type="button" id="import-tab" class="outline-button import-button">＋ 导入自定义 TAB</button>
     </aside>
 
     <div class="workbench">
@@ -41,12 +41,20 @@
         <div class="studio-head">
           <div>
             <div class="exercise-meta"><span id="exercise-level" class="level"></span><span id="exercise-style"></span></div>
-            <h2 id="exercise-title"></h2>
+            <h2 id="exercise-title" tabindex="-1"></h2>
             <p id="exercise-description"></p>
           </div>
           <label class="select-field rhythm-field">节奏型
             <select id="rhythm-select" aria-describedby="rhythm-hint"></select>
           </label>
+        </div>
+
+        <div id="import-info" class="import-info" hidden>
+          <p id="import-summary"></p>
+          <details id="source-details" hidden>
+            <summary>查看第一张识别到的原谱</summary>
+            <img id="source-page" alt="识别到的第一张原谱预览">
+          </details>
         </div>
 
         <div class="mode-row">
@@ -94,10 +102,10 @@
               <div class="tempo-top">
                 <label class="tempo-label" for="tempo-number">速度</label>
                 <button id="tempo-down" type="button" class="step-button" aria-label="降低 5 BPM">−</button>
-                <div class="tempo-value"><input id="tempo-number" type="number" min="40" max="180" step="1" inputmode="numeric" aria-label="BPM" required><span>BPM</span></div>
+                <div class="tempo-value"><input id="tempo-number" type="number" min="40" max="220" step="1" inputmode="numeric" aria-label="BPM" required><span>BPM</span></div>
                 <button id="tempo-up" type="button" class="step-button" aria-label="提高 5 BPM">+</button>
               </div>
-              <input id="tempo-range" type="range" min="40" max="180" step="1" aria-label="速度滑块">
+              <input id="tempo-range" type="range" min="40" max="220" step="1" aria-label="速度滑块">
               <button id="practice-up" type="button" class="text-button">练顺了，+3 BPM</button>
             </div>
 
@@ -132,27 +140,25 @@
         <div><h2>这一段怎么练</h2><p id="practice-tip"></p></div>
       </aside>
 
-      <footer class="footer">所有谱例均为原创练习。<span>G、D、A、E 从最细弦排到最粗弦，数字表示品位，0 代表空弦，R 表示休止。</span></footer>
+      <footer class="footer">内置谱例均为原创练习。<span>G、D、A、E 从最细弦排到最粗弦，数字表示品位，0 代表空弦，R 表示休止。</span></footer>
     </div>
   </main>
 
-  <dialog id="tab-dialog" aria-labelledby="tab-dialog-title">
-    <form id="tab-form">
-      <h2 id="tab-dialog-title">导入自定义 TAB</h2>
-      <p>粘贴 G、D、A、E 四行 TAB，用 | 分小节，最多 16 小节。谱段保存在当前浏览器。</p>
-      <label>练习名称<input id="tab-name" type="text" maxlength="45" placeholder="我想练的谱段"></label>
-      <label>四线谱<textarea id="tab-input" rows="5" maxlength="12000" required spellcheck="false"></textarea></label>
-      <label>每个音的时值（可选）
-        <input id="tab-timing" type="text" maxlength="1000" placeholder="1 1 1 1 | 1 r0.5 0.5 1 1" spellcheck="false">
-      </label>
-      <p class="dialog-help">每小节共 4 拍，可写 0.25、0.5、1、2、4，r0.5 表示休止半拍。留空时，同一小节内的音均分 4 拍。</p>
-      <p id="tab-error" role="alert" hidden></p>
-      <div class="dialog-actions">
-        <button type="button" id="tab-example" class="text-button">填入示例</button>
-        <button type="button" id="tab-cancel" class="outline-button">取消</button>
-        <button type="submit" class="play-button">保存并练习</button>
-      </div>
-    </form>
+  <dialog id="score-dialog" aria-labelledby="score-dialog-title">
+    <h2 id="score-dialog-title">上传谱子</h2>
+    <p>上传四弦贝斯 TAB 的 PDF、PNG、JPG 或 WebP，自动生成可试听的练习谱。</p>
+    <label class="score-drop" id="score-drop" for="score-file">
+      <b>选择文件或拖到这里</b>
+      <span>最多 30 页、30 MB</span>
+      <input id="score-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp">
+    </label>
+    <p class="import-small">优先用平整、清晰的 4/4 四线谱。缺少清楚的时值标记时，会按谱面间距估算节奏。在当前浏览器内识别，并保留最近一次导入。</p>
+    <progress id="score-progress" aria-label="谱面识别进度" hidden></progress>
+    <p id="score-status" role="status" hidden></p>
+    <p id="score-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="score-cancel" class="outline-button">关闭</button>
+    </div>
   </dialog>
 </body>
 </html>

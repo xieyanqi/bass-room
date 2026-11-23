@@ -1,0 +1,12 @@
+{
+  "name": "bass-room",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:pdf": "node scripts/prepare-pdf.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "pdfjs-dist": "5.6.205"
+  }
+}
