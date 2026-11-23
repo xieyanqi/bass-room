@@ -7,13 +7,23 @@
 - 点击「打开麦克风跟谱」并允许麦克风权限。目标音识别正确后才切换到下一音。跟谱检查单音的音高和先后顺序，节奏仍可用节拍器模式练习。声音在浏览器内分析。
 - 可以导入一段四行 ASCII TAB，谱段保存在当前浏览器。导入框里有示例和手动输入时值的方法。
 
-## 本地运行
+## 本地开发
 
-在项目目录运行下列命令，然后打开浏览器里的 [http://localhost:8000](http://localhost:8000)。
+`localhost` 指的是运行命令的电脑。先下载或克隆这个仓库，然后在包含 `dist` 文件夹的项目根目录启动本地服务。
+
+Windows PowerShell
+
+```powershell
+py -m http.server 8000 --bind 127.0.0.1 --directory dist
+```
+
+macOS 或 Linux
 
 ```sh
-python3 -m http.server 8000 --directory dist
+python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 ```
+
+看到终端显示 `Serving HTTP` 后，保持终端运行，在同一台电脑的浏览器地址栏输入 `http://localhost:8000`。服务关闭后，这个本地地址便无法访问。
 
 麦克风需要从 localhost 或 HTTPS 打开。让麦克风听到贝斯音箱，或使用 USB 音频接口作为系统输入。
 
