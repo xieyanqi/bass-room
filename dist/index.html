@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ee">
+  <meta name="description" content="和节拍一起读谱。四弦贝斯原创练习，支持分段循环、BPM 调速和同步高亮。">
+  <title>低音练习室 · Bass Room</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%231d342c'/%3E%3Cpath d='M14 32V22m7 10V15m7 17V19m7 13V11' stroke='%23e2f398' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Bass<span class="brand-room">Room</span></div>
+      <span class="tuning"><span class="tuning-icon" aria-hidden="true">♬</span> 四弦标准调弦 <b>E A D G</b></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="library" aria-labelledby="library-title">
+      <div class="library-head">
+        <h2 id="library-title">练习库</h2>
+        <span id="exercise-count"></span>
+      </div>
+      <div id="exercise-list"></div>
+      <button type="button" id="import-tab" class="outline-button import-button">＋ 导入自定义 TAB</button>
+    </aside>
+
+    <div class="workbench">
+      <section class="hero" aria-labelledby="site-title">
+        <div class="hero-copy">
+          <span class="hero-rule" aria-hidden="true"></span>
+          <h1 id="site-title">低音练习室</h1>
+          <p>读谱、数拍，练稳每一小节。</p>
+        </div>
+      </section>
+
+      <section class="studio" aria-labelledby="exercise-title">
+        <div class="studio-head">
+          <div>
+            <div class="exercise-meta"><span id="exercise-level" class="level"></span><span id="exercise-style"></span></div>
+            <h2 id="exercise-title"></h2>
+            <p id="exercise-description"></p>
+          </div>
+          <label class="select-field rhythm-field">节奏型
+            <select id="rhythm-select" aria-describedby="rhythm-hint"></select>
+          </label>
+        </div>
+
+        <div class="mode-row">
+          <div class="mode-list" aria-label="练习方式">
+            <button type="button" data-mode="listen" aria-pressed="false">先听示范</button>
+            <button type="button" data-mode="follow" aria-pressed="true">跟着弹</button>
+            <button type="button" data-mode="read" aria-pressed="false">自己读谱</button>
+          </div>
+          <button type="button" id="mic-button" class="outline-button" aria-pressed="false">打开麦克风跟谱</button>
+        </div>
+        <div id="mic-panel" class="mic-panel" hidden>
+          <div class="mic-top"><b>麦克风跟谱</b><span id="mic-input" aria-hidden="true"><i></i></span></div>
+          <div id="mic-progress-row" class="mic-progress-row" hidden>
+            <progress id="mic-progress" value="0" max="1" aria-label="本遍已识别音符"></progress>
+            <span id="mic-count"></span>
+          </div>
+          <p id="mic-status" role="status"></p>
+          <p class="mic-help">每次拨一个音，弹对后谱面会前进。使用能被麦克风听到的音箱或 USB 音频接口。声音只在浏览器内分析。</p>
+        </div>
+
+        <div class="beat-strip" aria-label="四四拍视觉节拍">
+          <div class="beat-caption"><b>视觉节拍</b><span>4/4</span></div>
+          <div id="beats" class="beats" aria-hidden="true">
+            <span class="beat">1</span><span class="beat">2</span><span class="beat">3</span><span class="beat">4</span>
+          </div>
+          <span class="position" id="position"></span>
+        </div>
+
+        <div class="score-heading">
+          <span><b>四弦 TAB</b> <span class="score-detail" id="score-detail"></span></span>
+          <div class="score-actions"><span id="rhythm-hint"></span><button type="button" id="pick-beats" class="outline-button" aria-pressed="false">选拍循环</button></div>
+        </div>
+        <p id="range-hint" class="range-hint" role="status" hidden></p>
+        <div id="score" class="score" aria-label="贝斯四线谱"></div>
+        <p id="note-cue" class="note-cue">播放时看拨弦、延音和消音提示。</p>
+
+        <div class="transport">
+          <div class="transport-main">
+            <div class="play-controls">
+              <button id="play" type="button" class="play-button" aria-keyshortcuts="Space"><span class="play-icon" aria-hidden="true"></span><span id="play-label">播放</span></button>
+              <button id="reset" type="button" class="reset-button" aria-label="回到开头" title="回到开头"><span aria-hidden="true">↺</span></button>
+            </div>
+
+            <div class="tempo-group" aria-label="速度">
+              <div class="tempo-top">
+                <label class="tempo-label" for="tempo-number">速度</label>
+                <button id="tempo-down" type="button" class="step-button" aria-label="降低 5 BPM">−</button>
+                <div class="tempo-value"><input id="tempo-number" type="number" min="40" max="180" step="1" inputmode="numeric" aria-label="BPM" required><span>BPM</span></div>
+                <button id="tempo-up" type="button" class="step-button" aria-label="提高 5 BPM">+</button>
+              </div>
+              <input id="tempo-range" type="range" min="40" max="180" step="1" aria-label="速度滑块">
+              <button id="practice-up" type="button" class="text-button">练顺了，+3 BPM</button>
+            </div>
+
+            <div class="loop-group">
+              <label class="switch-row"><input id="loop" type="checkbox" checked><span class="switch" aria-hidden="true"></span><span>循环播放</span></label>
+              <select id="loop-range" aria-label="播放范围"></select>
+            </div>
+          </div>
+
+          <div class="sound-row">
+            <div class="sound-controls">
+              <label><input id="metronome" type="checkbox" checked> 节拍器</label>
+              <label><input id="bass-audio" type="checkbox" checked> 贝斯示范</label>
+              <label><input id="count-in" type="checkbox" checked> 预备一小节</label>
+              <label class="subdivide-field">细分拍
+                <select id="subdivision" aria-label="细分拍">
+                  <option value="4">只听正拍</option>
+                  <option value="2">八分细分</option>
+                  <option value="1">十六分细分</option>
+                </select>
+              </label>
+            </div>
+            <span class="keyboard-hint"><kbd>空格</kbd> 播放 / 暂停</span>
+          </div>
+          <p class="sr-only" id="play-announcement" role="status"></p>
+          <p hidden id="audio-error" role="alert">音频启动失败。可以再次点击播放，或换一个浏览器。</p>
+        </div>
+      </section>
+
+      <aside class="practice-tip" aria-label="练习建议">
+        <span class="tip-icon" aria-hidden="true">♪</span>
+        <div><h2>这一段怎么练</h2><p id="practice-tip"></p></div>
+      </aside>
+
+      <footer class="footer">所有谱例均为原创练习。<span>G、D、A、E 从最细弦排到最粗弦，数字表示品位，0 代表空弦，R 表示休止。</span></footer>
+    </div>
+  </main>
+
+  <dialog id="tab-dialog" aria-labelledby="tab-dialog-title">
+    <form id="tab-form">
+      <h2 id="tab-dialog-title">导入自定义 TAB</h2>
+      <p>粘贴 G、D、A、E 四行 TAB，用 | 分小节，最多 16 小节。谱段保存在当前浏览器。</p>
+      <label>练习名称<input id="tab-name" type="text" maxlength="45" placeholder="我想练的谱段"></label>
+      <label>四线谱<textarea id="tab-input" rows="5" maxlength="12000" required spellcheck="false"></textarea></label>
+      <label>每个音的时值（可选）
+        <input id="tab-timing" type="text" maxlength="1000" placeholder="1 1 1 1 | 1 r0.5 0.5 1 1" spellcheck="false">
+      </label>
+      <p class="dialog-help">每小节共 4 拍，可写 0.25、0.5、1、2、4，r0.5 表示休止半拍。留空时，同一小节内的音均分 4 拍。</p>
+      <p id="tab-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" id="tab-example" class="text-button">填入示例</button>
+        <button type="button" id="tab-cancel" class="outline-button">取消</button>
+        <button type="submit" class="play-button">保存并练习</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
